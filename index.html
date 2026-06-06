@@ -319,7 +319,7 @@ tbody tr:hover { background: rgba(10,21,18,0.02); }
 
   <div class="topbar-right">
     <span class="stock-count" id="hdr-count">336 stocks</span>
-    <span class="topbar-snap">06 Jun 2026, 11:35 PM IST</span>
+    <span class="topbar-snap">06 Jun 2026, 11:42 PM IST</span>
   </div>
 </header>
 
@@ -352,11 +352,11 @@ tbody tr:hover { background: rgba(10,21,18,0.02); }
           <th class="sortable" onclick="sortBy('fractal_high')">Mth Fractal <span id="arr-fractal_high"></span></th>
           <th class="sortable" onclick="sortBy('current_price')">Current ₹ <span id="arr-current_price"></span></th>
           <th class="sortable" onclick="sortBy('gain_pct')">Gain % <span id="arr-gain_pct"></span></th>
-          <th class="sortable" onclick="sortBy('exit_signal')">Exit <span id="arr-exit_signal"></span></th>
+          <th class="sortable" onclick="sortBy('sl_status')">Exit <span id="arr-sl_status"></span></th>
           <th class="sortable" onclick="sortBy('alpha_tag')">Alpha <span id="arr-alpha_tag"></span></th>
           <th class="sortable" onclick="sortBy('score_trigger')">Score @ Entry <span id="arr-score_trigger"></span></th>
           <th class="sortable" onclick="sortBy('score_now')">Score Now <span id="arr-score_now"></span></th>
-          <th class="sortable" onclick="sortBy('rank')">RS Rank <span id="arr-rank"></span></th>
+          <th class="sortable" onclick="sortBy('rs_score')">RS Score <span id="arr-rs_score"></span></th>
         </tr>
       </thead>
       <tbody id="ss-body"></tbody>
@@ -366,7 +366,7 @@ tbody tr:hover { background: rgba(10,21,18,0.02); }
 </main>
 
 <footer class="footer">
-  Signal Scout · Rhythm Capital · snapshot 06 Jun 2026, 11:35 PM IST
+  Signal Scout · Rhythm Capital · snapshot 06 Jun 2026, 11:42 PM IST
 </footer>
 
 <script>
@@ -377,8 +377,8 @@ const ALL_DATA = [...SS_DATA, ...IPO_DATA];
 
 // ── State ───────────────────────────────────────────────────────────────
 let currentTab  = 'all';
-let sortKey     = 'entry_date';
-let sortAsc     = true;
+let sortKey     = 'gain_pct';
+let sortAsc     = false;
 let filtered    = [];
 
 // ── Match operational app exactly ────────────────────────────────────────
@@ -427,7 +427,7 @@ function sortBy(key) {
   if (sortKey === key) { sortAsc = !sortAsc; }
   else {
     sortKey = key;
-    sortAsc = ['symbol','entry_date','industry_name','sector'].includes(key);
+    sortAsc = ['symbol','entry_date','industry_name','sector','industry','entry_type'].includes(key);
   }
   document.querySelectorAll('th span[id^="arr-"]').forEach(el => el.textContent = '');
   const arr = document.getElementById('arr-' + key);
@@ -442,9 +442,24 @@ function render() {
            : currentTab === 'closed' ? ALL_DATA.filter(s =>  s.closed)
            : ALL_DATA.filter(s => !s.closed && s.entry_type === currentTab);
 
+  // SL priority for exit sort — mirrors operational app
+  const SL_PRIORITY = { rsi: 4, kc: 3, '2atr': 2, watch: 1, safe: 0 };
+  function slPriority(s) {
+    if (s.sl_status === 'hit') return SL_PRIORITY[s.sl_hit_type] ?? 2;
+    if (s.sl_status === 'watch') return 1;
+    return 0;
+  }
+
   // Sort
   filtered = [...filtered].sort((a, b) => {
-    let va = a[sortKey], vb = b[sortKey];
+    let va, vb;
+    if (sortKey === 'sl_status') {
+      va = slPriority(a); vb = slPriority(b);
+    } else if (sortKey === 'rs_score') {
+      va = a.rs_score ?? a.rank; vb = b.rs_score ?? b.rank;
+    } else {
+      va = a[sortKey]; vb = b[sortKey];
+    }
     if (va == null) va = sortAsc ? '\uFFFF' : -Infinity;
     if (vb == null) vb = sortAsc ? '\uFFFF' : -Infinity;
     if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
@@ -509,20 +524,20 @@ function render() {
     const closedDateStr = s.closed ? `<div style="font-size:9px;color:var(--ink-40);font-family:var(--mono);">closed ${s.closed_date ?? ''}</div>` : '';
 
     return `<tr style="${rowStyle}">
-      <td class="muted" style="padding-left:16px;padding-right:4px">${i+1}</td>
+      <td style="color:var(--ink-40);font-size:11px;padding-left:16px;padding-right:4px">${i+1}</td>
       <td><a class="sym" href="${tvUrl}" target="_blank" rel="noopener">${s.symbol}</a>${closedDateStr}</td>
       <td>${typeBadge}</td>
-      <td class="muted" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;" title="${industry}">${industry}</td>
-      <td class="muted" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;" title="${s.sector ?? ''}">${s.sector ?? '—'}</td>
-      <td class="mono muted">${s.entry_date ?? '—'}</td>
-      <td class="mono">₹${s.entry_price?.toFixed(2) ?? '—'}</td>
-      <td class="mono muted">${fh ? '₹'+fh.toFixed(2) : '—'}</td>
-      <td class="mono">₹${s.current_price?.toFixed(2) ?? '—'}</td>
+      <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${industry}">${industry}</td>
+      <td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${s.sector ?? ''}">${s.sector ?? '—'}</td>
+      <td style="font-family:var(--mono);font-size:11px;">${s.entry_date ?? '—'}</td>
+      <td style="font-family:var(--mono);">₹${s.entry_price?.toFixed(2) ?? '—'}</td>
+      <td style="font-family:var(--mono);color:var(--ink-60);">${fh ? '₹'+fh.toFixed(2) : '—'}</td>
+      <td style="font-family:var(--mono);">₹${s.current_price?.toFixed(2) ?? '—'}</td>
       <td style="background:${gainBg}">${gainHtml}</td>
       <td>${exitBadge}</td>
       <td>${alpha}</td>
-      <td class="mono muted">${scoreEntry}</td>
-      <td class="mono" style="font-weight:600;color:${scoreColor};background:${scoreBg}">${scoreNow}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--ink-60);">${scoreEntry}</td>
+      <td style="font-family:var(--mono);font-size:11px;font-weight:600;color:${scoreColor};background:${scoreBg}">${scoreNow}</td>
       <td>${rsHtml}</td>
     </tr>`;
   }).join('');
