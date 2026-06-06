@@ -169,6 +169,13 @@ body {
 .tab-close:hover { background: rgba(177,69,48,0.08); color: var(--danger); border-color: rgba(177,69,48,0.4); }
 .tab-close.active { background: var(--danger); border-color: var(--danger); color: #fff; }
 
+/* ── SL/Exit badges — match operational app ── */
+.badge { font-family: var(--mono); font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 999px; display: inline-flex; align-items: center; }
+.badge-exit  { background: rgba(177,69,48,0.12);   color: #B14530; }
+.badge-watch { background: rgba(197,138,26,0.12);  color: #C58A1A; }
+.badge-safe  { background: rgba(10,21,18,0.06);    color: var(--ink-60); }
+.badge-sl2atr { background: rgba(155,48,220,0.10); color: #9b30dc; }
+
 /* ── CSV button ── */
 .btn-csv {
   margin-left: auto;
@@ -312,7 +319,7 @@ tbody tr:hover { background: rgba(10,21,18,0.02); }
 
   <div class="topbar-right">
     <span class="stock-count" id="hdr-count">336 stocks</span>
-    <span class="topbar-snap">06 Jun 2026, 11:27 PM IST</span>
+    <span class="topbar-snap">06 Jun 2026, 11:35 PM IST</span>
   </div>
 </header>
 
@@ -326,7 +333,7 @@ tbody tr:hover { background: rgba(10,21,18,0.02); }
     <button class="tab-btn"        data-tab="alternate" onclick="setTab('alternate',this)">Alternate</button>
     <button class="tab-btn"        data-tab="early"     onclick="setTab('early',this)">Early Entry</button>
     <button class="tab-btn"        data-tab="ipo_early" onclick="setTab('ipo_early',this)">IPO</button>
-    <button class="tab-btn tab-close" data-tab="close"  onclick="setTab('close',this)">⚑ Close</button>
+    <button class="tab-btn tab-close" data-tab="closed" onclick="setTab('closed',this)">Closed</button>
     <span class="count-badge" id="count-badge"></span>
   </div>
 
@@ -359,7 +366,7 @@ tbody tr:hover { background: rgba(10,21,18,0.02); }
 </main>
 
 <footer class="footer">
-  Signal Scout · Rhythm Capital · snapshot 06 Jun 2026, 11:27 PM IST
+  Signal Scout · Rhythm Capital · snapshot 06 Jun 2026, 11:35 PM IST
 </footer>
 
 <script>
@@ -374,18 +381,39 @@ let sortKey     = 'entry_date';
 let sortAsc     = true;
 let filtered    = [];
 
-const TYPE_META = {
-  standard:  { short:'ST',   bg:'#1E8B7E', fg:'#ffffff' },
-  alternate: { short:'Alt',  bg:'#9333EA', fg:'#ffffff' },
-  early:     { short:'Erly', bg:'#C58A1A', fg:'#ffffff' },
-  ipo_early: { short:'IPO',  bg:'#0C4A44', fg:'#F0EEE9' },
+// ── Match operational app exactly ────────────────────────────────────────
+const SS_TYPE_META = {
+  standard:  { label:'Standard',  color:'#1E8B7E', short:'ST'  },
+  alternate: { label:'Alternate', color:'#9333EA', short:'Alt' },
+  early:     { label:'Early',     color:'#C58A1A', short:'E'   },
+  ipo_early: { label:'IPO',       color:'#0C4A44', short:'IPO' },
 };
 
-const EXIT_COLOR = {
-  exit:  { text:'#B14530', bg:'rgba(177,69,48,0.10)'  },
-  watch: { text:'#C58A1A', bg:'rgba(197,138,26,0.10)' },
-  safe:  { text:'#1E8B5C', bg:''                      },
+const SS_LABEL_META = {
+  ST: { color:'#1E8B7E', label:'Standard TRIX'  },
+  SR: { color:'#43a86b', label:'Standard RSI'   },
+  AT: { color:'#9333EA', label:'Alternate TRIX' },
+  AR: { color:'#a64dff', label:'Alternate RSI'  },
+  E:  { color:'#C58A1A', label:'Early Entry'    },
 };
+
+function slBadge(status, hitType) {
+  if (!status || status === 'safe') return '<span class="badge badge-safe">SAFE</span>';
+  if (status === 'watch') return '<span class="badge badge-watch">WATCH</span>';
+  if (status === 'hit') {
+    if (hitType === 'rsi')  return '<span class="badge badge-exit">RSI EXIT</span>';
+    if (hitType === 'kc')   return '<span class="badge badge-watch">KC HIT</span>';
+    if (hitType === '2atr') return '<span class="badge badge-sl2atr">2ATR HIT</span>';
+    return '<span class="badge badge-exit">HIT</span>';
+  }
+  return '<span class="muted">—</span>';
+}
+
+function alphaBadge(tag) {
+  if (tag === 'alpha+') return `<span class="badge" style="background:#E4B73E;color:#5C3A00;border:1px solid #C99A28;font-weight:700;border-radius:3px;padding:2px 6px;">α+</span>`;
+  if (tag === 'alpha')  return `<span class="badge" style="background:rgba(30,139,126,0.15);color:#0C4A44;border:1px solid rgba(30,139,126,0.4);border-radius:3px;padding:2px 6px;">α</span>`;
+  return '—';
+}
 
 // ── Tab switching ────────────────────────────────────────────────────────
 function setTab(tab, el) {
@@ -409,10 +437,10 @@ function sortBy(key) {
 
 // ── Render ───────────────────────────────────────────────────────────────
 function render() {
-  // Filter
+  // Filter — mirrors operational _renderSsTable exactly
   filtered = currentTab === 'all'    ? ALL_DATA
-           : currentTab === 'close'  ? ALL_DATA.filter(s => s.exit_signal === 'exit')
-           : ALL_DATA.filter(s => s.entry_type === currentTab);
+           : currentTab === 'closed' ? ALL_DATA.filter(s =>  s.closed)
+           : ALL_DATA.filter(s => !s.closed && s.entry_type === currentTab);
 
   // Sort
   filtered = [...filtered].sort((a, b) => {
@@ -429,27 +457,34 @@ function render() {
 
   // Rows
   const rows = filtered.map((s, i) => {
-    // Type badge — solid filled box
-    const meta      = TYPE_META[s.entry_type] ?? { short:'?', bg:'#999', fg:'#fff' };
-    const typeBadge = `<span class="badge" style="background:${meta.bg};color:${meta.fg};border-color:${meta.bg}">${meta.short}</span>`;
+    // Type badge — mirrors operational app (entry_label, had_early_entry, closed state)
+    const lmeta  = s.entry_label ? SS_LABEL_META[s.entry_label] : null;
+    const tmeta  = SS_TYPE_META[s.entry_type] ?? { label: s.entry_type, color:'#999', short:'?' };
+    const bColor = s.closed ? '#999999' : (lmeta?.color ?? tmeta.color);
+    const baseLabel = (s.entry_label && s.entry_label !== '?') ? s.entry_label : tmeta.short;
+    const bLabel = s.closed ? `${baseLabel} ✗` : (s.had_early_entry ? `E→${baseLabel}` : baseLabel);
+    const closedReason = s.closed_reason === 'rsi' ? 'RSI Exit' : s.closed_reason === 'kc' ? 'KC SL' : s.closed_reason === '2atr' ? '2ATR SL' : 'Closed';
+    const bTitle = s.closed
+      ? `${closedReason} on ${s.closed_date ?? '?'} @ ₹${s.exit_price ?? '?'}`
+      : (lmeta?.label ?? tmeta.label);
+    const badgeBg  = s.closed ? `${bColor}22` : bColor;
+    const badgeFg  = s.closed ? bColor : '#ffffff';
+    const badgeBdr = s.closed ? `${bColor}44` : bColor;
+    const typeBadge = `<span title="${bTitle}" style="font-size:10px;font-family:var(--mono);font-weight:600;background:${badgeBg};color:${badgeFg};border:1px solid ${badgeBdr};border-radius:3px;padding:1px 6px;">${bLabel}</span>`;
 
     // Gain % — colored text + muted cell background
     const gain    = s.gain_pct;
     const gainBg  = gain == null ? '' : gain >= 0 ? 'rgba(30,139,92,0.09)' : 'rgba(177,69,48,0.09)';
     const gainHtml = gain == null ? '—'
-      : `<span class="${gain >= 0 ? 'gain-pos' : 'gain-neg'}">${gain >= 0 ? '+' : ''}${gain.toFixed(1)}%</span>`;
+      : gain >= 0
+        ? `<span class="gain-pos">+${gain.toFixed(1)}%</span>`
+        : `<span class="gain-neg">${gain.toFixed(1)}%</span>`;
 
-    // Exit signal — colored text + muted cell background
-    const exitSig  = s.exit_signal ?? '—';
-    const exitMeta = EXIT_COLOR[exitSig] ?? { text:'var(--ink-40)', bg:'' };
-    const exitHtml = `<span style="font-size:10px;font-weight:600;color:${exitMeta.text}">${exitSig}</span>`;
+    // Exit/SL badge — exact slBadge from operational app
+    const exitBadge = slBadge(s.sl_status, s.sl_hit_type);
 
-    // Alpha badge — alpha+ is gold, alpha is teal
-    const alpha = s.alpha_tag === 'alpha+'
-      ? `<span class="badge" style="background:#E4B73E;color:#5C3A00;border-color:#C99A28;font-weight:700">α+</span>`
-      : s.alpha_tag === 'alpha'
-      ? `<span class="badge" style="background:rgba(30,139,126,0.15);color:#0C4A44;border-color:rgba(30,139,126,0.4)">α</span>`
-      : '—';
+    // Alpha badge
+    const alpha = alphaBadge(s.alpha_tag);
 
     const fh       = s.fractal_high ?? s.weekly_fractal_high;
     const industry = s.industry_name || s.industry || '—';
@@ -464,9 +499,18 @@ function render() {
       ? (s.score_now > s.score_trigger ? 'rgba(30,139,92,0.07)' : s.score_now < s.score_trigger ? 'rgba(177,69,48,0.07)' : '')
       : '';
 
-    return `<tr>
+    // RS rank — use rs_score (IPO) or rank (superstocks), with color tiers
+    const rsScore = s.rs_score ?? s.rank;
+    const rsColor = rsScore == null ? 'var(--ink-40)' : rsScore >= 70 ? 'var(--success)' : rsScore >= 50 ? 'var(--warning)' : 'var(--ink-40)';
+    const rsHtml  = rsScore != null ? `<span style="font-weight:600;color:${rsColor}">${rsScore.toFixed(0)}</span>` : '—';
+
+    // Dim closed rows only outside the Closed tab
+    const rowStyle = (s.closed && currentTab !== 'closed') ? 'opacity:0.55;' : '';
+    const closedDateStr = s.closed ? `<div style="font-size:9px;color:var(--ink-40);font-family:var(--mono);">closed ${s.closed_date ?? ''}</div>` : '';
+
+    return `<tr style="${rowStyle}">
       <td class="muted" style="padding-left:16px;padding-right:4px">${i+1}</td>
-      <td><a class="sym" href="${tvUrl}" target="_blank" rel="noopener">${s.symbol}</a></td>
+      <td><a class="sym" href="${tvUrl}" target="_blank" rel="noopener">${s.symbol}</a>${closedDateStr}</td>
       <td>${typeBadge}</td>
       <td class="muted" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;" title="${industry}">${industry}</td>
       <td class="muted" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;" title="${s.sector ?? ''}">${s.sector ?? '—'}</td>
@@ -475,11 +519,11 @@ function render() {
       <td class="mono muted">${fh ? '₹'+fh.toFixed(2) : '—'}</td>
       <td class="mono">₹${s.current_price?.toFixed(2) ?? '—'}</td>
       <td style="background:${gainBg}">${gainHtml}</td>
-      <td style="background:${exitMeta.bg}">${exitHtml}</td>
+      <td>${exitBadge}</td>
       <td>${alpha}</td>
       <td class="mono muted">${scoreEntry}</td>
       <td class="mono" style="font-weight:600;color:${scoreColor};background:${scoreBg}">${scoreNow}</td>
-      <td class="mono muted">${s.rank != null ? s.rank.toFixed(0) : '—'}</td>
+      <td>${rsHtml}</td>
     </tr>`;
   }).join('');
 
