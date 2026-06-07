@@ -359,7 +359,7 @@ tbody tr:hover { background: rgba(10,21,18,0.02); }
 
   <div class="topbar-right">
     <span class="stock-count" id="hdr-count">469 stocks</span>
-    <span class="topbar-snap">07 Jun 2026, 03:58 PM IST</span>
+    <span class="topbar-snap">07 Jun 2026, 04:04 PM IST</span>
     <button class="btn-explain" onclick="openExplain()">Explain</button>
   </div>
 </header>
@@ -451,7 +451,7 @@ tbody tr:hover { background: rgba(10,21,18,0.02); }
     </div>
 
     <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--rule);font-size:11px;color:var(--ink-40);text-align:center;font-family:var(--mono);">
-      Signal Scout · Rhythm Capital · 07 Jun 2026, 03:58 PM IST
+      Signal Scout · Rhythm Capital · 07 Jun 2026, 04:04 PM IST
     </div>
 
   </div>
@@ -501,7 +501,7 @@ tbody tr:hover { background: rgba(10,21,18,0.02); }
 </main>
 
 <footer class="footer">
-  Signal Scout · Rhythm Capital · snapshot 07 Jun 2026, 03:58 PM IST
+  Signal Scout · Rhythm Capital · snapshot 07 Jun 2026, 04:04 PM IST
 </footer>
 
 <script>
@@ -585,17 +585,30 @@ function sortBy(key) {
 
 // ── Render ───────────────────────────────────────────────────────────────
 function render() {
-  // Multi-select filter
+  // Multi-select filter — Closed is an AND modifier, not an OR
+  const _closedSel = activeTabs.has('closed');
+  const _alphaSel  = activeTabs.has('alpha');
+  const _entryTabs = new Set([...activeTabs].filter(t => t !== 'closed' && t !== 'alpha'));
+
   if (activeTabs.size === 0) {
+    // All — show everything (closed rows dimmed via rowStyle)
     filtered = ALL_DATA;
+  } else if (_closedSel && _entryTabs.size === 0 && !_alphaSel) {
+    // Closed only — all closed entries
+    filtered = ALL_DATA.filter(s => s.closed);
   } else {
     filtered = ALL_DATA.filter(s => {
-      for (const tab of activeTabs) {
-        if (tab === 'closed'  && s.closed)                        return true;
-        if (tab === 'alpha'   && !s.closed && s.alpha_tag)        return true;
-        if (tab !== 'closed' && tab !== 'alpha' && !s.closed && s.entry_type === tab) return true;
+      // Step 1: match entry type / alpha
+      let matchesType = false;
+      if (_entryTabs.size === 0 && !_alphaSel) {
+        matchesType = true;
+      } else {
+        if (_entryTabs.has(s.entry_type)) matchesType = true;
+        if (_alphaSel && s.alpha_tag)     matchesType = true;
       }
-      return false;
+      if (!matchesType) return false;
+      // Step 2: apply closed modifier
+      return _closedSel ? s.closed : !s.closed;
     });
   }
 
@@ -677,7 +690,7 @@ function render() {
     const rsHtml  = rsScore != null ? `<span style="font-weight:600;color:${rsColor}">${rsScore.toFixed(0)}</span>` : '—';
 
     // Dim closed rows only outside the Closed tab
-    const rowStyle = (s.closed && !activeTabs.has('closed')) ? 'opacity:0.55;' : '';
+    const rowStyle = (activeTabs.size === 0 && s.closed) ? 'opacity:0.55;' : '';
     const closedDateStr = s.closed ? `<div style="font-size:9px;color:var(--ink-40);font-family:var(--mono);">closed ${s.closed_date ?? ''}</div>` : '';
 
     return `<tr style="${rowStyle}">
