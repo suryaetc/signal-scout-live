@@ -235,7 +235,7 @@ tbody tr:hover { background:rgba(10,21,18,0.02); }
   <span class="topbar-title">Superstocks</span>
   <div class="topbar-right">
     <span class="stock-count" id="hdr-count">863 stocks</span>
-    <span class="topbar-snap">14 Jul 2026, 07:25 PM IST</span>
+    <span class="topbar-snap">14 Jul 2026, 07:38 PM IST</span>
     <button class="btn-explain" onclick="openExplain()">Explain</button>
   </div>
 </header>
@@ -336,7 +336,7 @@ tbody tr:hover { background:rgba(10,21,18,0.02); }
     </div>
 
     <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--rule);font-size:11px;color:var(--ink-40);text-align:center;font-family:var(--mono);">
-      Signal Scout · 14 Jul 2026, 07:25 PM IST
+      Signal Scout · 14 Jul 2026, 07:38 PM IST
     </div>
   </div>
 </aside>
@@ -472,7 +472,7 @@ tbody tr:hover { background:rgba(10,21,18,0.02); }
 </main>
 
 <footer class="footer">
-  Signal Scout · snapshot 14 Jul 2026, 07:25 PM IST
+  Signal Scout · snapshot 14 Jul 2026, 07:38 PM IST
 </footer>
 
 <script>
@@ -730,13 +730,15 @@ function setTab(tab) {
   document.getElementById('ss-track-record').style.display = goingToIpo ? 'none' : '';
   document.getElementById('details-btn').style.display  = goingToIpo ? 'none' : '';
   document.getElementById('ipo-view').style.display     = goingToIpo ? '' : 'none';
+  if (!goingToIpo) {
+    _tabs.clear();
+    if (tab !== 'all') _tabs.add(tab);
+  }
   document.querySelectorAll('.ss-tab').forEach(b => {
     const t = b.dataset.tab;
     b.classList.toggle('active', goingToIpo ? t === 'ipo' : (t === 'all' ? _tabs.size === 0 : _tabs.has(t)));
   });
   if (goingToIpo) { renderIpo(); return; }
-  _tabs.clear();
-  if (tab !== 'all') _tabs.add(tab);
   render();
 }
 
